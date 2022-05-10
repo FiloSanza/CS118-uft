@@ -23,14 +23,10 @@ class Client:
     def _is_response_valid(self, response) -> bool:
         if not response["success"]:
             return False
-        if "checksum" in response:
+        if response["checksum"]:
             payload = response["data"]
             checksum = response["checksum"]
             payload_hash = hashlib.md5(payload).digest()
-
-            print(payload)
-            print(payload_hash)
-
             return payload_hash == checksum
         return True
 
@@ -89,7 +85,27 @@ class Client:
             return False 
 
     def _handle_put_command(self, command, args) -> bool:
-        pass
+        try:
+            data = None
+            with open(args["path"], "rb") as file:
+                data = file.read()
+
+            print(f"File {args['path']} opened, {len(data)} bytes.")
+
+            args["data"] = data
+            args["checksum"] = hashlib.md5(data).digest()
+
+            self.socket.sendto(self._get_payload(command, args), (self.srv_address, self.srv_port))
+            response, _ = self.socket.recvfrom(CONFIG["max_packet_size"])
+            response = pickle.loads(response)
+            print(response)
+
+            if self._is_response_valid(response):
+                return True
+
+        except Exception as e:
+            print(e)
+            return False
 
     def run(self, command, args) -> None:
         self._try_handle(command, args, CONFIG["max_tries"])
