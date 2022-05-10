@@ -11,10 +11,21 @@ class Commands(Enum):
     PUT = auto()
     GET = auto()
     LIST = auto()
+    
+    def from_str(s: str):
+        s = s.lower()
+        if s == 'list' or s == 'ls':
+            return Commands.LIST
+        elif s == 'put':
+            return Commands.PUT
+        elif s == 'get':
+            return Commands.GET
+        else:
+            return None
 
 @dataclass
 class CommandResult:
-    result: bool
+    success: bool
     data: bytes = None
     checksum: bytes = None
 
@@ -51,11 +62,12 @@ class CommandHandler:
 
     def _handle_put_file(self, args) -> bool:
         name = args["name"]
-        raw_data = args["data"]
+        data = args["data"]
+        original_checksum = args["checksum"]
         path = CONFIG["file_path"] + name
-        data = pickle.loads(raw_data)
+        checksum = hashlib.md5(data).digest()
 
-        if utils.file_exists(path):
+        if utils.file_exists(path) or checksum != original_checksum:
             return CommandResult(False)
 
         with open(path, "wb") as file:
