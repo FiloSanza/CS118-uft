@@ -55,9 +55,10 @@ class CommandHandler:
         if utils.file_exists(path):
             with open(path, "rb") as file:
                 data = file.read()
-                checksum = hashlib.md5(data).hexdigest()
+                checksum = hashlib.md5(data).digest()
                 return CommandResult(True, data, checksum)
         else:
+            print(f"File {path} not found")
             return CommandResult(False)
 
     def _handle_put_file(self, args) -> bool:
