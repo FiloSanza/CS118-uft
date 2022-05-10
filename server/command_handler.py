@@ -51,8 +51,9 @@ class CommandHandler:
             return CommandResult(False)
 
     def _handle_put_file(self, args) -> bool:
-        [name, data] = args
+        [name, raw_data] = args
         path = CONFIG["file_path"] + name
+        data = pickle.loads(raw_data)
 
         if utils.file_exists(path):
             return CommandResult(False)
