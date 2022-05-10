@@ -14,7 +14,7 @@ class Commands(Enum):
     
     def from_str(s: str):
         s = s.lower()
-        if s == 'list' or s == 'ls':
+        if s == 'list':
             return Commands.LIST
         elif s == 'put':
             return Commands.PUT
