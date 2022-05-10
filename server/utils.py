@@ -12,7 +12,7 @@ def get_readable_size_string(size_in_bytes: int) -> str:
     elif size_in_bytes < GB_size:
         return f"{round(size_in_bytes / MB_size, 2)} MB"
     else:
-        return f"{round(size_in_bytes, GB_size, 2)}, GB"
+        return f"{round(size_in_bytes / GB_size, 2)}, GB"
 
 def file_exists(path: str) -> bool:
     return os.path.exists(path)
