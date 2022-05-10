@@ -10,7 +10,7 @@ def get_parser() -> ArgumentParser:
 
     parser_list = sub_parsers.add_parser("list", help="List the files on the server.")
 
-    parser_put = sub_parsers.add_parser("put", help="Upload a file to the server")
+    parser_put = sub_parsers.add_parser("put", help="Upload a file to the server (create a new file or replace it if it's already there).")
     parser_put.add_argument("--path", type=str, help="The path to the file to upload.", required=True)
     parser_put.add_argument("--name", type=str, help="The name used to save the file on the server.", required=True)
 

@@ -68,7 +68,7 @@ class CommandHandler:
         path = CONFIG["file_path"] + name
         checksum = hashlib.md5(data).digest()
 
-        if utils.file_exists(path) or checksum != original_checksum:
+        if checksum != original_checksum:
             return CommandResult(False)
 
         with open(path, "wb") as file:
