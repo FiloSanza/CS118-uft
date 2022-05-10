@@ -9,7 +9,7 @@ class Client:
         self.srv_address = srv_address
         self.srv_port = srv_port
         self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
-        self.socket.settimeout(1.5)
+        self.socket.settimeout(CONFIG["connection_timeout"])
 
         self.handlers = {
             'list': self._handle_list_command,
