@@ -1,9 +1,9 @@
 from command_handler import *
+from server import Server
 
 def main():
-    handler = CommandHandler(Commands.GET, ["yes.txt"])
-    res = handler.handle()
-    print(res)
+    srv = Server('localhost', 12345)
+    srv.start()
 
 if __name__ == '__main__':
     main()

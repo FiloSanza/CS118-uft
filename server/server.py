@@ -1,3 +1,5 @@
+from connection_handler import ConnectionHandler
+from config import CONFIG
 import socket as skt
 
 class Server:
@@ -5,6 +7,7 @@ class Server:
         self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
         self.socket.bind((address, port))
 
-    def start():
+    def start(self):
         while True:
-            pass
+            raw_data, address = self.socket.recvfrom(CONFIG["MAX_PACKET_SIZE"])
+            ConnectionHandler(address, raw_data).start()
