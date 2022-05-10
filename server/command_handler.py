@@ -1,17 +1,16 @@
 from dataclasses import dataclass
 from config import CONFIG
-from enum import Enum
+from enum import Enum, auto
 from glob import glob
 import hashlib
 import pickle
 import utils
 import os
 
-
 class Commands(Enum):
-    PUT = 0
-    GET = 1
-    LIST = 2
+    PUT = auto()
+    GET = auto()
+    LIST = auto()
 
 @dataclass
 class CommandResult:
@@ -38,7 +37,7 @@ class CommandHandler:
         return CommandResult(True, raw_data, checksum)
 
     def _handle_get_file(self, args) -> bool:
-        path = CONFIG["file_path"] + args[0]
+        path = CONFIG["file_path"] + args["name"]
 
         print(f"Get file: {path}")
 
@@ -51,7 +50,8 @@ class CommandHandler:
             return CommandResult(False)
 
     def _handle_put_file(self, args) -> bool:
-        [name, raw_data] = args
+        name = args["name"]
+        raw_data = args["data"]
         path = CONFIG["file_path"] + name
         data = pickle.loads(raw_data)
 
@@ -65,5 +65,3 @@ class CommandHandler:
 
     def handle(self) -> CommandResult:
         return self.handlers[self.command](self.args)
-
-
