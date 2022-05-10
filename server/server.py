@@ -9,5 +9,5 @@ class Server:
 
     def start(self):
         while True:
-            raw_data, address = self.socket.recvfrom(CONFIG["MAX_PACKET_SIZE"])
+            raw_data, address = self.socket.recvfrom(CONFIG["max_packet_size"])
             ConnectionHandler(address, raw_data).start()
