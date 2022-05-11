@@ -4,7 +4,7 @@ from config import CONFIG
 import socket as skt
 
 class Server:
-    def __init__(self, address, port) -> None:
+    def __init__(self, address: str, port: int) -> None:
         self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
         self.socket.bind((address, port))
         signal.signal(signal.SIGINT, self.close)

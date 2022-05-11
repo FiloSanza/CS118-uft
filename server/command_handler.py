@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 import re
+from typing import Any, Dict
 from config import CONFIG
 from enum import Enum, auto
 from glob import glob
 import hashlib
 import pickle
+import logging
 import utils
 import os
 
@@ -48,25 +50,28 @@ class CommandHandler:
 
         return CommandResult(True, raw_data, checksum)
 
-    def _handle_get_file(self, args) -> CommandResult:
+    def _handle_get_file(self, args: Dict[str, Any]) -> CommandResult:
         path = CONFIG["file_path"] + args["name"]
         block_start = args["block_start"]
         block_end = args["block_end"]
-        size = min(block_end - block_start, CONFIG["max_block_size"])
 
-        print(f"Get file: {path} block {block_start} - {block_end} | {size=}")
+        logging.debug(f"get file {path} | {block_start} - {block_end}")
 
+        size = os.path.getsize(path)
+        if block_start >= size or block_end > size or block_start >= block_end:
+            logging.warning(f"Invalid block requested ({block_start} - {block_end}) file is {size} bytes.")
+            return CommandResult(False)
         if utils.file_exists(path):
             with open(path, "rb") as file:
-                data = file.read()[block_start:block_end]
-                #TODO: hope it not die
+                file.seek(block_start)
+                data = file.read(block_end - block_start)
                 checksum = hashlib.md5(data).digest()
                 return CommandResult(True, data, checksum)
         else:
-            print(f"File {path} not found")
+            logging.warning(f"File {path} not found")
             return CommandResult(False)
 
-    def _save_block(self, args) -> CommandResult:
+    def _save_block(self, args: Dict[str, Any]) -> CommandResult:
         name = args["name"]
         block = args["block"]
         data = args["data"]
@@ -80,15 +85,13 @@ class CommandHandler:
         with open(path, "wb") as file:
             file.write(data)
 
-        print(f"block {block} saved")
-
         return CommandResult(True)
 
-    def _read_block(self, filename) -> bytes:
+    def _read_block(self, filename: str) -> bytes:
         with open(filename, "rb") as file:
             return file.read()
 
-    def _merge_file(self, args) -> CommandResult:
+    def _merge_file(self, args: Dict[str, Any]) -> CommandResult:
         try:
             name = args["name"]
             r = re.compile(f"^{name}\.tmp\.(?P<id>\d+)$")
@@ -99,19 +102,23 @@ class CommandHandler:
             ))
             files.sort(key=lambda f: f[0])
 
+            logging.debug(f"Save the file {name} - {len(files)} blocks.")
             path = CONFIG["file_path"] + name
             with open(path, "wb") as file:
                 file.write(b"".join(map(lambda x: x[1], files)))
 
+            logging.debug(f"Removing the temp blocks of {name}.")
             for file in files_raw:
                 os.remove(file)
 
+            logging.debug(f"Temp blocks of {name} removed.")
             return CommandResult(True)
+
         except Exception as e:
-            print(f"There has been an error: {e}")
+            logging.warning(f"There has been an error: {e}")
             return CommandResult(False)
 
-    def _handle_put_file(self, args) -> CommandResult:
+    def _handle_put_file(self, args: Dict[str, Any]) -> CommandResult:
         merge = args["merge"]
         if merge:
             return self._merge_file(args)
