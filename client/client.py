@@ -64,25 +64,34 @@ class Client:
             return False        
 
     def _handle_get_command(self, command, args) -> bool:
-        try:
-            self.socket.sendto(self._get_payload(command, args), (self.srv_address, self.srv_port))
+        address = (self.srv_address, self.srv_port)
+        #1) send the first message with command
+        self.socket.sendto(self._get_payload(command, args), address)
+        #2) recive the packet with the number of blocks
+        response, _ = self.socket.recvfrom(CONFIG["max_packet_size"])
+        response = pickle.loads(response)
+        nblocks = response["nblocks"]
+
+        print(f"I will receive: {nblocks} blocks")
+    
+        self.socket.sendto(response["checksum"], address)
+
+        # TODO: make it safe with checksum control
+
+        #3) recv blocks
+        data = []
+        for _ in range(nblocks):
             response, _ = self.socket.recvfrom(CONFIG["max_packet_size"])
             response = pickle.loads(response)
-            print(response)
+            chunk = response["data"]
+            data = data + chunk
+            self.socket.sendto(response["checksum"], address)
 
-            if self._is_response_valid(response):
-                data = response["data"]
-                print(f"Received {len(data)} bytes")
+        print(f"Received {len(data)} bytes")
 
-                with open(args["path"], "wb") as file:
-                    file.write(data)
-
-                print(f"File saved in {args['path']}")
-                return True
-
-        except Exception as e:
-            print(e)
-            return False 
+        with open(args["path"], "wb") as file:
+            file.write(data)
+            print(f"File saved in {args['path']}")
 
     def _handle_put_command(self, command, args) -> bool:
         try:
@@ -108,4 +117,4 @@ class Client:
             return False
 
     def run(self, command, args) -> None:
-        self._try_handle(command, args, CONFIG["max_tries"])
+        self.handlers[command](command, args)

@@ -9,6 +9,7 @@ class ConnectionHandler(Thread):
         self.address = address
         self.raw_data = raw_data
         self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
+        self.socket.settimeout(CONFIG["connection_timeout"])
 
     def run(self):
         print(f"Received data from {self.address} - {len(self.raw_data)} bytes")
@@ -16,5 +17,4 @@ class ConnectionHandler(Thread):
         command = Commands.from_str(command)
         print(f"command: {command} {args=}")
         handler = CommandHandler(command, args)
-        result = handler.handle()
-        self.socket.sendto(pickle.dumps(result.__dict__), self.address)
+        handler.handle(self.socket, self.address)

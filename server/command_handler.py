@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import math
+from tabnanny import check
 from config import CONFIG
 from enum import Enum, auto
 from glob import glob
@@ -39,29 +41,73 @@ class CommandHandler:
             Commands.GET: self._handle_get_file
         }
 
-    def _handle_list(self, _) -> CommandResult:
+    def _try_send(self, payload, socket, address) -> None:
+        """
+            Send payload to address using socket,
+            wait to receive the checksum of payload before continuing
+        """
+        tries = 1
+        checksum = hashlib.md5(payload).digest()
+        while tries <= CONFIG["max_tries"]:
+            try:
+                socket.sendto(payload, address)
+                client_hash, _ = socket.recvfrom(CONFIG["max_packet_size"])
+                if client_hash == check:
+                    return
+            except Exception:
+                pass
+            tries += 1
+
+    def _send_file(self, file, socket, address) -> None:
+        block_size = CONFIG["max_block_size"]
+        nblocks = math.ceil(len(file) / CONFIG["max_block_size"])
+        blocks = [file[i:min(i+block_size, len(file))] for i in range(0, len(file), block_size)]
+
+        #1) send the first packet with the number of blocks
+        info = {
+            'nblocks': nblocks,
+            'checksum': hashlib.md5(str(nblocks).encode()).digest()
+        }
+
+        if not self._try_send(pickle.dumps(info), socket, address):
+            print("An error occured while sendind the file.")
+            return
+
+        #2) send each block
+        for block in blocks:
+            payload = {
+                'checksum': hashlib.md5(block).digest(),
+                'data': block
+            }
+
+            if not self._try_send(pickle.dumps(payload), socket, address):
+                print("An error occured while sendind the file.")
+                return
+
+    def _handle_list(self, _, socket, address) -> None:
         files = filter(os.path.isfile, glob(CONFIG["file_path"] + "*"))
         files_with_size = [(path, utils.get_readable_size_string(os.stat(path).st_size)) for path in files]
         raw_data = pickle.dumps(files_with_size)
         checksum = hashlib.md5(raw_data).digest()
 
-        return CommandResult(True, raw_data, checksum)
+        result = CommandResult(True, raw_data, checksum)
+        socket.sendto(pickle.dumps(result.__dict__), address)
 
-    def _handle_get_file(self, args) -> bool:
+    def _handle_get_file(self, args, socket, address) -> None:
         path = CONFIG["file_path"] + args["name"]
 
         print(f"Get file: {path}")
 
-        if utils.file_exists(path):
-            with open(path, "rb") as file:
-                data = file.read()
-                checksum = hashlib.md5(data).digest()
-                return CommandResult(True, data, checksum)
-        else:
+        if not utils.file_exists(path):
             print(f"File {path} not found")
-            return CommandResult(False)
+            socket.sendto(pickle.dumps(CommandResult(False).__dict__), address)
+            return
 
-    def _handle_put_file(self, args) -> bool:
+        with open(path, "rb") as file:
+            data = file.read()
+            self._send_file(data, socket, address)
+
+    def _handle_put_file(self, args, socket, address) -> None:
         name = args["name"]
         data = args["data"]
         original_checksum = args["checksum"]
@@ -76,5 +122,5 @@ class CommandHandler:
 
         return CommandResult(True)
 
-    def handle(self) -> CommandResult:
-        return self.handlers[self.command](self.args)
+    def handle(self, socket, address) -> None:
+        return self.handlers[self.command](self.args, socket, address)
