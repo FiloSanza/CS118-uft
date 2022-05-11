@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import logging
 import math
 import pickle
 import socket as skt
@@ -11,9 +12,6 @@ from request_handler import handle_request
 class Client:
     def __init__(self, srv_address: str, srv_port: int) -> None:
         self.address = (srv_address, srv_port)
-        self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
-        self.socket.settimeout(CONFIG["connection_timeout"])
-
         self.handlers = {
             'list': self._handle_list_command,
             'get': self._handle_get_command,
@@ -26,7 +24,7 @@ class Client:
             files = list(filter(lambda x: x[0] == args["name"], self._get_list_data()))
 
             if not files or len(files) != 1:
-                print("File not present.")
+                logging.error("Cannot find the file on the server.")
                 return
 
             file_size = files[0][1]
@@ -46,16 +44,16 @@ class Client:
 
                 file = [f.result() for f in futures]
                 if any([not res.success for res in file]):
-                    print("Error downloading the file, try again.")
+                    logging.error("Error downloading the file, try again.")
                     return
                 file_data = b"".join(map(lambda x: x.data, file))
-                print(f"expected file size: {file_size} - actual file size {len(file_data)}")            
+                logging.info(f"Received: {file_size} - Expected: {len(file_data)}")            
 
                 with open(args["path"], "wb") as file:
                         file.write(file_data)
 
         except Exception as e:
-            print(f"Something went wrong: {e}")
+            logging.error(f"Exception raised: {e}")
 
     def _handle_put_command(self, command: str, args: Dict[str, Any]) -> None:
         # 1) send the blocks of the file
@@ -83,13 +81,13 @@ class Client:
             ) for id, data in blocks]
             results = [f.result() for f in futures]
             if any([not res.success for res in results]):
-                print("Error uploading the file, try again.")
+                logging.error("Error uploading the file, try again.")
                 return
 
         # 2) send the "merge" command
         result = handle_request(pickle.dumps((command, {**args, "merge": True})), self.address)
         if not result.success:
-            print("Error on the merge command.")
+            logging.error("Error, file not saved.")
             return
 
     def _get_list_data(self, command: str = 'list', args: Dict[str, Any] = {}) -> List[Tuple[str, int]]:
@@ -106,8 +104,7 @@ class Client:
             printable = "\n".join([f"{file} - {get_readable_size_string(size)}" for file, size in files])
             print(printable)
         else:
-            print("An error occurred.")
+            logging.error("Error, try again.")
 
     def run(self, command, args) -> None:
         self.handlers[command](command, args)
-        self.socket.close()

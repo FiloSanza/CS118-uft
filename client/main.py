@@ -1,6 +1,17 @@
 from argparse import ArgumentParser
+import logging
+import sys
 from client import Client
 from typing import Tuple
+from config import CONFIG
+
+logging.basicConfig(
+    level=CONFIG["log_level"],
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
 def get_parser() -> ArgumentParser:
     parser = ArgumentParser(
@@ -31,5 +42,5 @@ def get_validated_input(parser: ArgumentParser) -> Tuple[list, dict]:
 
 parser = get_parser()
 command, args = get_validated_input(parser)
-client = Client('localhost', 12345)
+client = Client(CONFIG["server_address"], CONFIG["server_port"])
 client.run(command, args)
