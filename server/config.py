@@ -7,5 +7,6 @@ CONFIG = {
     'max_block_size': 2**15,
     'address': 'localhost',
     'port': 12345,
-    'log_level': logging.INFO
+    'log_level': logging.INFO,
+    'connection_timeout': 2
 }

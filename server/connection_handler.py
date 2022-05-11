@@ -10,6 +10,7 @@ class ConnectionHandler(Thread):
         self.address = address
         self.raw_data = raw_data
         self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
+        self.socket.settimeout(CONFIG["connection_timeout"])
 
     def run(self):
         (command, args) = pickle.loads(self.raw_data)
