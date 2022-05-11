@@ -4,13 +4,12 @@ from config import CONFIG
 import logging
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=CONFIG["log_level"],
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout)
     ]
 )
-
 
 def main():
     srv = Server(CONFIG["address"], CONFIG["port"])
