@@ -41,7 +41,7 @@ class CommandHandler:
 
     def _handle_list(self, _) -> CommandResult:
         files = filter(os.path.isfile, glob(CONFIG["file_path"] + "*"))
-        files_with_size = [(path, utils.get_readable_size_string(os.stat(path).st_size)) for path in files]
+        files_with_size = [(utils.path_leaf(path), os.stat(path).st_size) for path in files]
         raw_data = pickle.dumps(files_with_size)
         checksum = hashlib.md5(raw_data).digest()
 
@@ -49,12 +49,16 @@ class CommandHandler:
 
     def _handle_get_file(self, args) -> bool:
         path = CONFIG["file_path"] + args["name"]
+        block_start = args["block_start"]
+        block_end = args["block_end"]
+        size = min(block_end - block_start, CONFIG["max_block_size"])
 
-        print(f"Get file: {path}")
+        print(f"Get file: {path} block {block_start} - {block_end} | {size=}")
 
         if utils.file_exists(path):
             with open(path, "rb") as file:
-                data = file.read()
+                data = file.read()[block_start:block_end]
+                #TODO: hope it not die
                 checksum = hashlib.md5(data).digest()
                 return CommandResult(True, data, checksum)
         else:
