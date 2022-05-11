@@ -4,8 +4,6 @@ import math
 import pickle
 import socket as skt
 from typing import Any, Dict, List, Tuple
-
-from numpy import block
 from config import CONFIG
 from utils import get_readable_size_string
 from request_handler import handle_request
@@ -112,3 +110,4 @@ class Client:
 
     def run(self, command, args) -> None:
         self.handlers[command](command, args)
+        self.socket.close()
