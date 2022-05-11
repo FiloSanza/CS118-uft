@@ -1,8 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import math
 import pickle
 import socket as skt
 from typing import Any, Dict, List, Tuple
+
+from numpy import block
 from config import CONFIG
 from utils import get_readable_size_string
 from request_handler import handle_request
@@ -33,7 +36,7 @@ class Client:
             nblocks = math.ceil(file_size / block_size)
 
             # 2) make the requests for each block
-            with ThreadPoolExecutor() as executor:
+            with ThreadPoolExecutor(max_workers=4) as executor:
                 futures = [executor.submit(
                     handle_request,
                     pickle.dumps((command, {
@@ -57,7 +60,39 @@ class Client:
             print(f"Something went wrong: {e}")
 
     def _handle_put_command(self, command: str, args: Dict[str, Any]) -> None:
-        pass
+        # 1) send the blocks of the file
+        path = args["path"]
+        
+        file_raw = []
+        with open(path, "rb") as file:
+            file_raw = file.read()
+        
+        block_size = CONFIG["max_block_size"]
+        nblocks = math.ceil(len(file_raw) / block_size)
+        blocks = [(i, file_raw[i*block_size : min(len(file_raw), (i+1)*block_size)]) for i in range(nblocks)]
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(
+                handle_request,
+                pickle.dumps((command, {
+                    **args,
+                    "block": id,
+                    "merge": False,
+                    "checksum": hashlib.md5(data).digest(),
+                    "data": data
+                })),
+                self.address
+            ) for id, data in blocks]
+            results = [f.result() for f in futures]
+            if any([not res.success for res in results]):
+                print("Error uploading the file, try again.")
+                return
+
+        # 2) send the "merge" command
+        result = handle_request(pickle.dumps((command, {**args, "merge": True})), self.address)
+        if not result.success:
+            print("Error on the merge command.")
+            return
 
     def _get_list_data(self, command: str = 'list', args: Dict[str, Any] = {}) -> List[Tuple[str, int]]:
         payload = pickle.dumps((command, args))

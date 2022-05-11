@@ -27,8 +27,10 @@ def _try_request(data: bytes, socket: skt.socket, address: Tuple[str, int]) -> R
         response = pickle.loads(response)        
         if _is_response_valid(response):
             return Response(True, response["data"])
-    except Exception:
-        pass
+        else:
+            print("Invalid response")
+    except Exception as e:
+        print(f"Exception raised: {e}")
     return Response(False)
 
 def handle_request(data: bytes, address: Tuple[str, int]) -> Response:
@@ -42,4 +44,5 @@ def handle_request(data: bytes, address: Tuple[str, int]) -> Response:
         if not response.success:
             print("There has been an error. I'll try again.")
 
+    socket.close()
     return response
