@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 from config import CONFIG
 from enum import Enum, auto
 from glob import glob
@@ -47,7 +48,7 @@ class CommandHandler:
 
         return CommandResult(True, raw_data, checksum)
 
-    def _handle_get_file(self, args) -> bool:
+    def _handle_get_file(self, args) -> CommandResult:
         path = CONFIG["file_path"] + args["name"]
         block_start = args["block_start"]
         block_end = args["block_end"]
@@ -65,11 +66,12 @@ class CommandHandler:
             print(f"File {path} not found")
             return CommandResult(False)
 
-    def _handle_put_file(self, args) -> bool:
+    def _save_block(self, args) -> CommandResult:
         name = args["name"]
+        block = args["block"]
         data = args["data"]
         original_checksum = args["checksum"]
-        path = CONFIG["file_path"] + name
+        path = f"{CONFIG['tmp_save_path']}{name}.tmp.{block}"
         checksum = hashlib.md5(data).digest()
 
         if checksum != original_checksum:
@@ -78,7 +80,44 @@ class CommandHandler:
         with open(path, "wb") as file:
             file.write(data)
 
+        print(f"block {block} saved")
+
         return CommandResult(True)
+
+    def _read_block(self, filename) -> bytes:
+        with open(filename, "rb") as file:
+            return file.read()
+
+    def _merge_file(self, args) -> CommandResult:
+        try:
+            name = args["name"]
+            r = re.compile(f"^{name}\.tmp\.(?P<id>\d+)$")
+            files_raw = list(filter(lambda f: os.path.isfile(f) and r.match(utils.path_leaf(f)), glob(CONFIG["tmp_save_path"] + "*")))
+            files = list(map(
+                lambda file: (file[0], self._read_block(file[1])), 
+                [(r.match(utils.path_leaf(f))["id"], f) for f in files_raw]
+            ))
+            files.sort(key=lambda f: f[0])
+
+            path = CONFIG["file_path"] + name
+            with open(path, "wb") as file:
+                file.write(b"".join(map(lambda x: x[1], files)))
+
+            for file in files_raw:
+                os.remove(file)
+
+            return CommandResult(True)
+        except Exception as e:
+            print(f"There has been an error: {e}")
+            return CommandResult(False)
+
+    def _handle_put_file(self, args) -> CommandResult:
+        merge = args["merge"]
+        if merge:
+            return self._merge_file(args)
+        else:
+            return self._save_block(args)
+        
 
     def handle(self) -> CommandResult:
         return self.handlers[self.command](self.args)

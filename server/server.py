@@ -11,3 +11,4 @@ class Server:
         while True:
             raw_data, address = self.socket.recvfrom(CONFIG["max_packet_size"])
             ConnectionHandler(address, raw_data).start()
+            #TODO: close socket on exit
