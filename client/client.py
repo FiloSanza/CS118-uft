@@ -1,13 +1,15 @@
-from fcntl import F_SEAL_SEAL
-import hashlib
-from config import CONFIG
-import socket as skt
+from concurrent.futures import ThreadPoolExecutor
+import math
 import pickle
+import socket as skt
+from typing import Any, Dict, List, Tuple
+from config import CONFIG
+from utils import get_readable_size_string
+from request_handler import handle_request
 
 class Client:
-    def __init__(self, srv_address, srv_port) -> None:
-        self.srv_address = srv_address
-        self.srv_port = srv_port
+    def __init__(self, srv_address: str, srv_port: int) -> None:
+        self.address = (srv_address, srv_port)
         self.socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
         self.socket.settimeout(CONFIG["connection_timeout"])
 
@@ -17,95 +19,61 @@ class Client:
             'put': self._handle_put_command
         }
 
-    def _get_payload(self, command, args) -> bytes:
-        return pickle.dumps((command, args))
-
-    def _is_response_valid(self, response) -> bool:
-        if not response["success"]:
-            return False
-        if response["checksum"]:
-            payload = response["data"]
-            checksum = response["checksum"]
-            payload_hash = hashlib.md5(payload).digest()
-            return payload_hash == checksum
-        return True
-
-    def _try_handle(self, command, args, max_tries) -> None:
-        tries = 1
-        success = False
-
-        while not success and tries <= max_tries:
-            success = self.handlers[command](command, args)
-            tries += 1
-            if not success:
-                print("There has been an error. I'll try again.")
-
-        if not success:
-            print("Could not connect to the server, try again.")
-
-    def _handle_list_command(self, command, args) -> bool:
-        """
-            The client will send the command to the server,
-            it will then make sure that the payload's md5 hash
-            and the checksum from the server match.
-        """
-
+    def _handle_get_command(self, command: str, args: Dict[str, Any]) -> None:
         try:
-            self.socket.sendto(self._get_payload(command, args), (self.srv_address, self.srv_port))
-            response, _ = self.socket.recvfrom(CONFIG["max_packet_size"])
-            response = pickle.loads(response)
+            # 1) get the size of the selected file
+            files = list(filter(lambda x: x[0] == args["name"], self._get_list_data()))
 
-            if self._is_response_valid(response):
-                data = pickle.loads(response["data"])
-                printable_data = "\n".join([name + " - " + size for name, size in data])
-                print(printable_data)
-                return True
-        except Exception:
-            return False        
+            if not files or len(files) != 1:
+                print("File not present.")
+                return
 
-    def _handle_get_command(self, command, args) -> bool:
-        try:
-            self.socket.sendto(self._get_payload(command, args), (self.srv_address, self.srv_port))
-            response, _ = self.socket.recvfrom(CONFIG["max_packet_size"])
-            response = pickle.loads(response)
-            print(response)
+            file_size = files[0][1]
+            block_size = CONFIG["max_block_size"]
+            nblocks = math.ceil(file_size / block_size)
 
-            if self._is_response_valid(response):
-                data = response["data"]
-                print(f"Received {len(data)} bytes")
+            # 2) make the requests for each block
+            with ThreadPoolExecutor() as executor:
+                futures = [executor.submit(
+                    handle_request,
+                    pickle.dumps((command, {
+                        **args, 
+                        "block_start": i * block_size,
+                        "block_end": min((i + 1) * block_size, file_size)})),
+                    self.address
+                ) for i in range(nblocks)]
+
+                file = [f.result() for f in futures]
+                if any([not res.success for res in file]):
+                    print("Error downloading the file, try again.")
+                    return
+                file_data = b"".join(map(lambda x: x.data, file))
+                print(f"expected file size: {file_size} - actual file size {len(file_data)}")            
 
                 with open(args["path"], "wb") as file:
-                    file.write(data)
-
-                print(f"File saved in {args['path']}")
-                return True
+                        file.write(file_data)
 
         except Exception as e:
-            print(e)
-            return False 
+            print(f"Something went wrong: {e}")
 
-    def _handle_put_command(self, command, args) -> bool:
-        try:
-            data = None
-            with open(args["path"], "rb") as file:
-                data = file.read()
+    def _handle_put_command(self, command: str, args: Dict[str, Any]) -> None:
+        pass
 
-            print(f"File {args['path']} opened, {len(data)} bytes.")
+    def _get_list_data(self, command: str = 'list', args: Dict[str, Any] = {}) -> List[Tuple[str, int]]:
+        payload = pickle.dumps((command, args))
+        response = handle_request(payload, self.address)
+        files = None
+        if response.success:
+            files = pickle.loads(response.data)
+        return files
 
-            args["data"] = data
-            args["checksum"] = hashlib.md5(data).digest()
-
-            self.socket.sendto(self._get_payload(command, args), (self.srv_address, self.srv_port))
-            response, _ = self.socket.recvfrom(CONFIG["max_packet_size"])
-            response = pickle.loads(response)
-            print(response)
-
-            if self._is_response_valid(response):
-                return True
-
-        except Exception as e:
-            print(e)
-            return False
+    def _handle_list_command(self, command: str, args: Dict[str, Any]) -> None:
+        files = self._get_list_data(command, args)
+        if files:
+            printable = "\n".join([f"{file} - {get_readable_size_string(size)}" for file, size in files])
+            print(printable)
+        else:
+            print("An error occurred.")
 
     def run(self, command, args) -> None:
-        self._try_handle(command, args, CONFIG["max_tries"])
+        self.handlers[command](command, args)
