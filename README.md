@@ -59,7 +59,7 @@ python3 main.py list
 You can also set `main.py` as executable and run it as:
 
 ```sh
-./main.py
+./main.py list
 ```
 
 ### Get

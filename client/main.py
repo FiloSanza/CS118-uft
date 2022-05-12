@@ -16,8 +16,7 @@ logging.basicConfig(
 )
 
 def get_parser() -> ArgumentParser:
-    parser = ArgumentParser(
-    description="uft - UDP File Transfer", allow_abbrev=False)
+    parser = ArgumentParser(description="uft - UDP File Transfer", allow_abbrev=False)
 
     sub_parsers = parser.add_subparsers(dest="command", help="sub-command help.", required=True)
 

@@ -3,7 +3,6 @@ import hashlib
 import logging
 import math
 import pickle
-import socket as skt
 from typing import Any, Dict, List, Tuple
 from config import CONFIG
 from utils import get_readable_size_string
@@ -33,6 +32,7 @@ class Client:
 
             # 2) make the requests for each block
             with ThreadPoolExecutor(max_workers=4) as executor:
+                # Create a future object (thread) for each block of the file.
                 futures = [executor.submit(
                     handle_request,
                     pickle.dumps((command, {
@@ -46,6 +46,7 @@ class Client:
                 if any([not res.success for res in file]):
                     logging.error("Error downloading the file, try again.")
                     return
+                # Write the file
                 file_data = b"".join(map(lambda x: x.data, file))
                 logging.debug(f"Received: {file_size} - Expected: {len(file_data)}")            
 
@@ -55,7 +56,7 @@ class Client:
         except Exception as e:
             logging.error(f"Exception raised: {e}")
         
-        logging.inf("GET command executed successfully.")
+        logging.info("GET command executed successfully.")
 
     def _handle_put_command(self, command: str, args: Dict[str, Any]) -> None:
         # 1) send the blocks of the file
@@ -70,6 +71,7 @@ class Client:
         blocks = [(i, file_raw[i*block_size : min(len(file_raw), (i+1)*block_size)]) for i in range(nblocks)]
 
         with ThreadPoolExecutor(max_workers=4) as executor:
+            # Create a future object (thread) for each block of the file.
             futures = [executor.submit(
                 handle_request,
                 pickle.dumps((command, {

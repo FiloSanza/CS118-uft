@@ -12,6 +12,10 @@ class Response:
     data: bytes = None
 
 def _is_response_valid(response: Dict[str, Any]) -> bool:
+    """
+        Check if a server response is valid using the success field and the checksum (if present). 
+    """
+
     if not response["success"]:
         return False
     if response["checksum"]:
@@ -22,9 +26,12 @@ def _is_response_valid(response: Dict[str, Any]) -> bool:
     return True
 
 def _try_request(data: bytes, socket: skt.socket, address: Tuple[str, int]) -> Response:
+    """
+        Try to make a request to the server and wait for a response, return the result.
+    """
+
     try:
         socket.sendto(data, address)
-        # socket.settimeout(2)
         response, _ = socket.recvfrom(CONFIG["max_packet_size"])
         response = pickle.loads(response)        
         if _is_response_valid(response):
@@ -36,6 +43,10 @@ def _try_request(data: bytes, socket: skt.socket, address: Tuple[str, int]) -> R
     return Response(False)
 
 def handle_request(data: bytes, address: Tuple[str, int]) -> Response:
+    """
+        Try to make a request until it's successful up to "CONFIG['max_tries']" times.
+    """
+
     socket = skt.socket(skt.AF_INET, skt.SOCK_DGRAM)
     socket.settimeout(CONFIG["connection_timeout"])
     tries = 1
