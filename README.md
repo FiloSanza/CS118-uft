@@ -14,6 +14,12 @@ To run the server use the following command in the server folder:
 python3 main.py
 ```
 
+You can also set `main.py` as executable and run it as:
+
+```sh
+./main.py
+```
+
 #### Configure
 
 To configure the server you can edit the `config.py` file, here's an example:
@@ -48,6 +54,12 @@ To list the files on the server run the following command in the `client` folder
 
 ```sh
 python3 main.py list
+```
+
+You can also set `main.py` as executable and run it as:
+
+```sh
+./main.py
 ```
 
 ### Get

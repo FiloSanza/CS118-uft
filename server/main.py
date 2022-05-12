@@ -1,3 +1,5 @@
+#!/bin/python3
+
 import sys
 from server import Server
 from config import CONFIG

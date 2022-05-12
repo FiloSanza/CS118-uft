@@ -1,3 +1,5 @@
+#!/bin/python3
+
 from argparse import ArgumentParser
 import logging
 import sys
