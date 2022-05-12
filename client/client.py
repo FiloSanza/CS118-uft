@@ -47,13 +47,15 @@ class Client:
                     logging.error("Error downloading the file, try again.")
                     return
                 file_data = b"".join(map(lambda x: x.data, file))
-                logging.info(f"Received: {file_size} - Expected: {len(file_data)}")            
+                logging.debug(f"Received: {file_size} - Expected: {len(file_data)}")            
 
                 with open(args["path"], "wb") as file:
                         file.write(file_data)
 
         except Exception as e:
             logging.error(f"Exception raised: {e}")
+        
+        logging.inf("GET command executed successfully.")
 
     def _handle_put_command(self, command: str, args: Dict[str, Any]) -> None:
         # 1) send the blocks of the file
@@ -89,6 +91,8 @@ class Client:
         if not result.success:
             logging.error("Error, file not saved.")
             return
+
+        logging.info("PUT command executed successfully.")
 
     def _get_list_data(self, command: str = 'list', args: Dict[str, Any] = {}) -> List[Tuple[str, int]]:
         payload = pickle.dumps((command, args))
